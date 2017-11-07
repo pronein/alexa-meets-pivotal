@@ -1,6 +1,7 @@
 const lib = require('lib');
 //const pivotal = require('../pivotalapi');
 const request = require('request');
+const pivotal = require('../../lib/pivotal');
 
 const common = {
   apiToken: '',
@@ -159,7 +160,7 @@ function Api() {
 
   function getTaskHours(description) {
     const lowered = description.toLowerCase().trim();
-    const hoursRegex = /\((\d+\.?\d*?)h\)$/;
+    const hoursRegex = /\((\d+\.?\d*?)hr?\)$/;
 
     const match = hoursRegex.exec(lowered);
     if (match) {
@@ -169,7 +170,6 @@ function Api() {
     return 0;
   }
 }
-
 
 Api.prototype.uris = {
   projects: 'projects',
@@ -193,17 +193,43 @@ module.exports = (project = '', iteration = 0, callback) => {
   //let client = new tracker.Client(apiToken);
   let api = new Api();
   let projectId = api.projects[project];
+  const newApi = new pivotal.Api(common.apiToken);
 
-  api.getCurrentIterationId(projectId, function (err, proj) {
-    console.log(`${JSON.stringify(err ? err : proj, null, 2)}`);
-    console.log(`Current Iteration #${proj.currentIteration}`);
+  newApi.getCurrentIterationId(projectId, function (err, iterationId) {
+    console.log(`getCurrentIterationid:: ${JSON.stringify(err ? err : iterationId, null, 2)}`);
+    console.log(`Current Iteration #${iterationId}`);
 
-    api.getIteration(projectId, iteration || proj.currentIteration, function (err, iter) {
+    api.getIteration(projectId, iteration || iterationId, function (err, iter) {
       if (iter) delete iter.stories;
 
-      console.log('Iteration Data:');
-      console.log(JSON.stringify(err ? err : iter, null, 2));
-      return callback(null, `Project ${project} [${iteration}]`);
+      newApi.getIteration(projectId, iteration || iterationId, function(errNew, iterationObj) {
+        console.log('Api Iteration Data:');
+        console.log(JSON.stringify(err ? err : iter, null, 2));
+        console.log('NewApi Iteration Data:');
+        const sprintStoryCount = iterationObj.getTotalStories(false, true);
+        const prodStoryCount = iterationObj.getTotalStories();
+        const techDebtStoryCount = sprintStoryCount - prodStoryCount;
+        const bugBashStoryCount = iterationObj.getTotalStories(false, true, true) - sprintStoryCount;
+
+        console.log(JSON.stringify(errNew ? errNew : {
+          velocity: iterationObj.velocity,
+          sprintStories: sprintStoryCount,
+          completeStories: iterationObj.getTotalStories(true, true),
+          sprintProdStories: prodStoryCount,
+          sprintTechDebtStories: techDebtStoryCount,
+          sprintBugBashStories: bugBashStoryCount,
+          totalPoints: iterationObj.getTotalPoints(),
+          completePoints: iterationObj.getTotalPoints(true),
+          totalHours: iterationObj.getTotalHours(null, false, true),
+          totalHoursDev: iterationObj.getTotalHours('DEV', false, true),
+          totalHoursQa: iterationObj.getTotalHours('QA', false, true),
+          completeHours: iterationObj.getTotalHours(null, true, true),
+          completeHoursDev: iterationObj.getTotalHours('DEV', true, true),
+          completeHoursQa: iterationObj.getTotalHours('QA', true, true)
+        }, null, 2));
+
+        return callback(null, `Project ${project} [${iteration || iterationId}]`);
+      });
     });
   });
 };
