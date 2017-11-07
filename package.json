@@ -6,7 +6,8 @@
   "main": "functions/__main__.js",
   "dependencies": {
     "lib": "^3.0.1",
-    "pivotaltracker": "^0.1.4"
+    "pivotaltracker": "^0.1.4",
+    "request": "^2.83.0"
   },
   "private": true,
   "stdlib": {
